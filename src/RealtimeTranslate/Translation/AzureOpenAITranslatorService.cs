@@ -10,7 +10,7 @@ using OpenAI.Chat;
 namespace RealtimeTranslate.Translation;
 
 /// <summary>
-/// オプションの高品質エンジン。Azure OpenAI の LLM（既定 gpt-4.1-mini）で英→日翻訳する。
+/// オプションの高品質エンジン。Azure OpenAI の LLM（既定 gpt-4.1）で英→日翻訳する。
 /// OCR の軽微な誤認識を文脈で補正でき、より自然な訳になる。翻訳は推論不要のため非推論モデルを使い、
 /// トークンをストリーミングで受け取って逐次表示する。
 /// </summary>

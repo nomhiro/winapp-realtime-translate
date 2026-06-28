@@ -43,8 +43,8 @@ public sealed class AppSettings
     public string OpenAIEndpoint { get; set; } = "";
     public string OpenAIKey { get; set; } = "";
 
-    /// <summary>デプロイ名。既定は gpt-4.1-mini（遅延・精度・コストのバランス）。</summary>
-    public string OpenAIDeployment { get; set; } = "gpt-4.1-mini";
+    /// <summary>デプロイ名。既定は gpt-4.1（高品質モード向け）。</summary>
+    public string OpenAIDeployment { get; set; } = "gpt-4.1";
 
     // --- 言語（英→日固定だが将来拡張のため保持） ---
     public string SourceLanguage { get; set; } = "en";

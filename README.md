@@ -37,10 +37,10 @@ GUI の場合: 設定 → 時刻と言語 → 言語と地域 → 「English (Un
 | --- | --- | --- |
 | **Speech**（Azure AI Speech） | 音声認識＋翻訳 | 必須（音声機能を使う場合） |
 | **Translator**（Azure AI Translator） | 画面テキスト翻訳（既定エンジン） | 必須（画面機能を使う場合） |
-| **Azure OpenAI** ＋ `gpt-4.1-mini` デプロイ | 画面翻訳の高品質モード | 任意 |
+| **Azure OpenAI** ＋ `gpt-4.1` デプロイ | 画面翻訳の高品質モード | 任意 |
 
 > 画面翻訳の既定は低遅延の **Azure Translator**。OCR 誤認識の文脈補正やより自然な訳が必要なときだけ、
-> 設定で **Azure OpenAI（既定モデル `gpt-4.1-mini`）** に切り替えます。翻訳に推論は不要なため、推論モデル
+> 設定で **Azure OpenAI（既定モデル `gpt-4.1`）** に切り替えます。翻訳に推論は不要なため、推論モデル
 > （gpt-5 系・o 系）は遅延が増えるだけで採用していません。
 
 ## ビルドと実行
@@ -68,7 +68,7 @@ dotnet publish src/RealtimeTranslate -c Release -r win-x64 --self-contained true
 1. アプリ起動後、ツールバーの **設定** を開く。
 2. **Azure Speech** のキー・リージョンを入力。
 3. **Azure Translator** のキー・リージョンを入力。
-4. （任意）高品質モードを使う場合は **Azure OpenAI** のエンドポイント・キー・デプロイ名（`gpt-4.1-mini`）を入力し、
+4. （任意）高品質モードを使う場合は **Azure OpenAI** のエンドポイント・キー・デプロイ名（`gpt-4.1`）を入力し、
    「翻訳エンジン」を OpenAI に変更。
 5. 保存。キーは **DPAPI（現在のユーザー）で暗号化**して
    `%APPDATA%\RealtimeTranslate\settings.dat` に保存されます（平文で残りません）。
