@@ -25,11 +25,15 @@
                         Margin="2" Padding="8,4" Click="OnToggleMode"/>
                 <Button Content="今すぐ翻訳" Margin="2" Padding="8,4" Click="OnTranslateNow"
                         ToolTip="アクティブなブラウザを今すぐ1回翻訳します"/>
+                <Button Content="今すぐ回答" Margin="2" Padding="8,4" Click="OnAnswerNow"
+                        ToolTip="画面の問題＋音声内容をAzure OpenAIに送り、答えと理由を生成します"/>
+                <Button Content="クリア" Margin="2" Padding="8,4" Click="OnClearHistory"
+                        ToolTip="字幕・画面テキストの履歴を消去します"/>
                 <Button Content="A-" Margin="2" Padding="8,4" Click="OnFontMinus"/>
                 <Button Content="A+" Margin="2" Padding="8,4" Click="OnFontPlus"/>
                 <CheckBox Content="最前面" IsChecked="{Binding AlwaysOnTop}" Foreground="White"
                           VerticalAlignment="Center" Margin="8,2,2,2"/>
-                <CheckBox Content="原文" IsChecked="{Binding ShowOriginal}" Foreground="White"
+                <CheckBox Content="原文(音声)" IsChecked="{Binding ShowOriginal}" Foreground="White"
                           VerticalAlignment="Center" Margin="4,2,2,2"/>
                 <Button Content="設定" Margin="2" Padding="8,4" Click="OnOpenSettings"/>
             </WrapPanel>
@@ -72,7 +76,8 @@
                 <ListBox x:Name="SubtitleList" ItemsSource="{Binding Subtitles}"
                          Background="#1E1E1E" BorderThickness="0" Margin="8,0"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         HorizontalContentAlignment="Stretch">
+                         HorizontalContentAlignment="Stretch"
+                         VirtualizingStackPanel.IsVirtualizing="False">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -103,7 +108,8 @@
                 <ListBox x:Name="ScreenList" ItemsSource="{Binding ScreenTexts}"
                          Background="#1E1E1E" BorderThickness="0" Margin="8,0,8,6"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         HorizontalContentAlignment="Stretch">
+                         HorizontalContentAlignment="Stretch"
+                         VirtualizingStackPanel.IsVirtualizing="False">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -116,11 +122,8 @@
                             <Border Background="#252526" Padding="8,6" CornerRadius="3" Margin="0,2"
                                     HorizontalAlignment="Left"
                                     MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ScrollContentPresenter}}">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Original}" Foreground="#9A9A9A" TextWrapping="Wrap"
-                                               Visibility="{Binding DataContext.ShowOriginal, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
-                                    <TextBlock Text="{Binding Translation}" Foreground="White" Margin="0,2,0,0" TextWrapping="Wrap"/>
-                                </StackPanel>
+                                <!-- 画面テキストは訳文（日本語）のみ表示。原文は出さない。 -->
+                                <TextBlock Text="{Binding Translation}" Foreground="White" TextWrapping="Wrap"/>
                             </Border>
                         </DataTemplate>
                     </ListBox.ItemTemplate>

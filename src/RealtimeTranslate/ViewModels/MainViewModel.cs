@@ -1,11 +1,13 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using RealtimeTranslate.Audio;
 using RealtimeTranslate.Config;
+using RealtimeTranslate.Llm;
 using RealtimeTranslate.Models;
 using RealtimeTranslate.Mvvm;
 using RealtimeTranslate.Screen;
@@ -38,6 +40,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     private AppSettings _settings;
     private ITextTranslator? _translator;
+    private QuestionAnswerService? _answerService;
 
     private SubtitleEntry? _interimSubtitle;
     private string _statusText = "準備完了";
@@ -362,6 +365,106 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         return new AzureTranslatorService(s.TranslatorKey, s.TranslatorRegion, s.SourceLanguage, s.TargetLanguage);
     }
 
+    // --- AI回答 ---
+    public async Task AnswerNowAsync()
+    {
+        if (!IsOpenAIConfigured())
+        {
+            StatusText = "AI回答には設定で Azure OpenAI（エンドポイント・キー・デプロイ名）の登録が必要です。";
+            return;
+        }
+
+        if (!_ocr.IsAvailable)
+        {
+            StatusText = OcrMissingMessage;
+            return;
+        }
+
+        StatusText = "問題テキストを取得中…";
+        string question = await CaptureQuestionTextAsync();
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            StatusText = "画面から英語の問題テキストを取得できませんでした。";
+            return;
+        }
+
+        string audioContext = GetRecentAudioContext();
+
+        var entry = new ScreenTextEntry("AI回答", question, "🤖 AI回答\n生成中…");
+        ScreenTexts.Add(entry);
+        while (ScreenTexts.Count > MaxScreenTexts)
+        {
+            ScreenTexts.RemoveAt(0);
+        }
+
+        StatusText = "AI回答を生成中…";
+        try
+        {
+            QuestionAnswerService service = GetAnswerService();
+            var builder = new StringBuilder();
+            await foreach (string delta in service.AnswerStreamAsync(question, audioContext))
+            {
+                builder.Append(delta);
+                entry.Translation = "🤖 AI回答\n" + builder.ToString();
+            }
+
+            if (builder.Length == 0)
+            {
+                entry.Translation = "🤖 AI回答\n(回答を生成できませんでした)";
+            }
+
+            StatusText = "AI回答を生成しました";
+        }
+        catch (Exception ex)
+        {
+            entry.Translation = $"🤖 AI回答\n(生成に失敗しました: {ex.Message})";
+            StatusText = "AI回答の生成に失敗しました";
+        }
+    }
+
+    /// <summary>アクティブなブラウザをキャプチャし、英語の問題テキストを抽出して返す（重い処理はプールスレッドで）。</summary>
+    private async Task<string> CaptureQuestionTextAsync()
+    {
+        return await Task.Run(async () =>
+        {
+            CaptureTarget? target = _tracker.GetCurrentTarget(_settings.BrowserProcessNames);
+            if (target is null)
+            {
+                return string.Empty;
+            }
+
+            using System.Drawing.Bitmap? bitmap = _screenCapture.Capture(target);
+            if (bitmap is null)
+            {
+                return string.Empty;
+            }
+
+            string raw = await _ocr.RecognizeAsync(bitmap).ConfigureAwait(false);
+            return EnglishTextExtractor.Extract(raw).Trim();
+        });
+    }
+
+    /// <summary>直近の音声字幕（英語原文）をまとめて文脈として返す。リスニング問題向け。</summary>
+    private string GetRecentAudioContext()
+    {
+        var parts = Subtitles
+            .Select(s => s.Original)
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .ToList();
+        return parts.Count == 0 ? string.Empty : string.Join(" ", parts.TakeLast(20));
+    }
+
+    private bool IsOpenAIConfigured()
+        => !string.IsNullOrWhiteSpace(_settings.OpenAIEndpoint)
+        && !string.IsNullOrWhiteSpace(_settings.OpenAIKey)
+        && !string.IsNullOrWhiteSpace(_settings.OpenAIDeployment);
+
+    private QuestionAnswerService GetAnswerService()
+    {
+        _answerService ??= new QuestionAnswerService(_settings.OpenAIEndpoint, _settings.OpenAIKey, _settings.OpenAIDeployment);
+        return _answerService;
+    }
+
     // --- 設定・表示 ---
     public void OpenSettings(Window owner)
     {
@@ -370,6 +473,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         {
             _settings = dialog.Result;
             _translator = null; // エンジン/キー変更を反映
+            _answerService = null;
             ApplyDisplayFromSettings();
             _hotkey.Register(_settings);
             ApplyScreenMode();
@@ -382,6 +486,15 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public void AdjustFontSize(double delta)
     {
         FontSize = Math.Clamp(FontSize + delta, 10, 48);
+    }
+
+    /// <summary>字幕履歴・画面テキスト履歴・インテリム行をすべてクリアする。</summary>
+    public void ClearHistory()
+    {
+        Subtitles.Clear();
+        ScreenTexts.Clear();
+        InterimSubtitle = null;
+        StatusText = "履歴をクリアしました";
     }
 
     private void ApplyDisplayFromSettings()

@@ -43,25 +43,42 @@ public partial class MainWindow : Window
     private async void OnTranslateNow(object sender, RoutedEventArgs e)
         => await _viewModel.TriggerScreenCaptureAsync();
 
+    private async void OnAnswerNow(object sender, RoutedEventArgs e)
+        => await _viewModel.AnswerNowAsync();
+
     private void OnFontPlus(object sender, RoutedEventArgs e) => _viewModel.AdjustFontSize(2);
 
     private void OnFontMinus(object sender, RoutedEventArgs e) => _viewModel.AdjustFontSize(-2);
 
     private void OnOpenSettings(object sender, RoutedEventArgs e) => _viewModel.OpenSettings(this);
 
+    private void OnClearHistory(object sender, RoutedEventArgs e) => _viewModel.ClearHistory();
+
     private void OnSubtitlesChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (e.Action == NotifyCollectionChangedAction.Add && SubtitleList.Items.Count > 0)
+        if (e.Action == NotifyCollectionChangedAction.Add)
         {
-            SubtitleList.ScrollIntoView(SubtitleList.Items[^1]);
+            ScrollToEnd(SubtitleList);
         }
     }
 
     private void OnScreenTextsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (e.Action == NotifyCollectionChangedAction.Add && ScreenList.Items.Count > 0)
+        if (e.Action == NotifyCollectionChangedAction.Add)
         {
-            ScreenList.ScrollIntoView(ScreenList.Items[^1]);
+            ScrollToEnd(ScreenList);
         }
+    }
+
+    // レイアウト確定後にスクロール（追加直後のスクロールはコンテナ実体化と競合し描画不具合の原因になるため遅延）
+    private static void ScrollToEnd(System.Windows.Controls.ListBox list)
+    {
+        list.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, () =>
+        {
+            if (list.Items.Count > 0)
+            {
+                list.ScrollIntoView(list.Items[^1]);
+            }
+        });
     }
 }
