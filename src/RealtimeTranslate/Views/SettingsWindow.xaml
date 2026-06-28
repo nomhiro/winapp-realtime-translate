@@ -1,0 +1,130 @@
+<Window x:Class="RealtimeTranslate.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="設定 - リアルタイム翻訳" Height="640" Width="560"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
+        FontFamily="Yu Gothic UI" FontSize="13">
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button x:Name="SaveButton" Content="保存" Width="90" Height="30" Margin="0,0,8,0" Click="OnSave" IsDefault="True"/>
+            <Button Content="キャンセル" Width="90" Height="30" Click="OnCancel" IsCancel="True"/>
+        </StackPanel>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- Azure Speech -->
+                <GroupBox Header="Azure Speech（音声認識＋翻訳）" Padding="8" Margin="0,0,0,8">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="キー" VerticalAlignment="Center" Margin="0,4"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SpeechKey, UpdateSourceTrigger=PropertyChanged}" Margin="0,4"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="リージョン" VerticalAlignment="Center" Margin="0,4"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SpeechRegion, UpdateSourceTrigger=PropertyChanged}" Margin="0,4"/>
+                    </Grid>
+                </GroupBox>
+
+                <!-- 画面翻訳エンジン -->
+                <GroupBox Header="画面テキスト翻訳" Padding="8" Margin="0,0,0,8">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="翻訳エンジン" VerticalAlignment="Center" Margin="0,4"/>
+                        <ComboBox x:Name="EngineCombo" Grid.Row="0" Grid.Column="1" Margin="0,4"
+                                  SelectedItem="{Binding ScreenEngine}"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="発動モード" VerticalAlignment="Center" Margin="0,4"/>
+                        <ComboBox x:Name="ModeCombo" Grid.Row="1" Grid.Column="1" Margin="0,4"
+                                  SelectedItem="{Binding ScreenMode}"/>
+                    </Grid>
+                </GroupBox>
+
+                <!-- Azure Translator -->
+                <GroupBox Header="Azure Translator（既定エンジン）" Padding="8" Margin="0,0,0,8">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="キー" VerticalAlignment="Center" Margin="0,4"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding TranslatorKey, UpdateSourceTrigger=PropertyChanged}" Margin="0,4"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="リージョン" VerticalAlignment="Center" Margin="0,4"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding TranslatorRegion, UpdateSourceTrigger=PropertyChanged}" Margin="0,4"/>
+                    </Grid>
+                </GroupBox>
+
+                <!-- Azure OpenAI -->
+                <GroupBox Header="Azure OpenAI（高品質モード・オプション）" Padding="8" Margin="0,0,0,8">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="エンドポイント" VerticalAlignment="Center" Margin="0,4"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding OpenAIEndpoint, UpdateSourceTrigger=PropertyChanged}" Margin="0,4"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="キー" VerticalAlignment="Center" Margin="0,4"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding OpenAIKey, UpdateSourceTrigger=PropertyChanged}" Margin="0,4"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="デプロイ名" VerticalAlignment="Center" Margin="0,4"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding OpenAIDeployment, UpdateSourceTrigger=PropertyChanged}" Margin="0,4"/>
+                    </Grid>
+                </GroupBox>
+
+                <!-- 動作・表示 -->
+                <GroupBox Header="動作・表示" Padding="8">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="自動キャプチャ間隔(ms)" VerticalAlignment="Center" Margin="0,4"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding AutoCaptureIntervalMs, UpdateSourceTrigger=PropertyChanged}" Margin="0,4"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="対象ブラウザ(カンマ区切り)" VerticalAlignment="Center" Margin="0,4"/>
+                        <TextBox x:Name="BrowserNamesBox" Grid.Row="1" Grid.Column="1" Margin="0,4"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="フォントサイズ" VerticalAlignment="Center" Margin="0,4"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding FontSize, UpdateSourceTrigger=PropertyChanged}" Margin="0,4"/>
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="ホットキー" VerticalAlignment="Center" Margin="0,4"/>
+                        <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,4">
+                            <CheckBox Content="Ctrl" IsChecked="{Binding HotkeyCtrl}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <CheckBox Content="Shift" IsChecked="{Binding HotkeyShift}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <CheckBox Content="Alt" IsChecked="{Binding HotkeyAlt}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <CheckBox Content="Win" IsChecked="{Binding HotkeyWin}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="キー:" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                            <TextBox x:Name="HotkeyKeyBox" Width="40" MaxLength="1" TextAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="0,4">
+                            <CheckBox Content="常時最前面" IsChecked="{Binding AlwaysOnTop}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <CheckBox Content="原文も表示" IsChecked="{Binding ShowOriginal}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                </GroupBox>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

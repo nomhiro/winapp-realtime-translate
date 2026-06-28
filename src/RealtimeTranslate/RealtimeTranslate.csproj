@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- WinRT の Windows.Media.Ocr / SoftwareBitmap を使うため Windows 10 SDK バージョンを指定 -->
+    <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.18362.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <RootNamespace>RealtimeTranslate</RootNamespace>
+    <AssemblyName>RealtimeTranslate</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="RealtimeTranslate.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.0" />
+    <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.50.0" />
+    <PackageReference Include="Azure.AI.Translation.Text" Version="2.0.0" />
+    <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
+  </ItemGroup>
+
+</Project>
