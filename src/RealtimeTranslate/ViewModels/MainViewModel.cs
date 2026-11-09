@@ -37,6 +37,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly WindowsMediaOcrService _ocr;
     private readonly AutoCaptureScheduler _scheduler;
     private readonly Hotkey.GlobalHotkeyService _hotkey = new();
+    private readonly DispatcherTimer _browserTargetTimer;
 
     private AppSettings _settings;
     private ITextTranslator? _translator;
@@ -50,6 +51,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private bool _alwaysOnTop = true;
     private bool _showOriginal = true;
     private string _targetBrowserText = "対象: 未検出";
+    private BrowserWindowOption _selectedBrowserTarget = BrowserWindowOption.Automatic;
 
     public MainViewModel(SettingsStore store)
     {
@@ -68,6 +70,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _scheduler.Status += (_, msg) => PostStatus(msg);
         _hotkey.Pressed += (_, _) => _ = TriggerScreenCaptureAsync();
 
+        BrowserTargets.Add(BrowserWindowOption.Automatic);
+        _browserTargetTimer = new DispatcherTimer(DispatcherPriority.Background, _dispatcher)
+        {
+            Interval = TimeSpan.FromMilliseconds(500),
+        };
+        _browserTargetTimer.Tick += (_, _) => RefreshBrowserTargets();
+
         ApplyDisplayFromSettings();
     }
 
@@ -75,6 +84,36 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<SubtitleEntry> Subtitles { get; } = new();
 
     public ObservableCollection<ScreenTextEntry> ScreenTexts { get; } = new();
+
+    public ObservableCollection<BrowserWindowOption> BrowserTargets { get; } = new();
+
+    public BrowserWindowOption SelectedBrowserTarget
+    {
+        get => _selectedBrowserTarget;
+        set
+        {
+            if (value is null || value == _selectedBrowserTarget)
+            {
+                return;
+            }
+
+            if (value.IsAutomatic)
+            {
+                _tracker.FollowAutomatically();
+            }
+            else if (value.Hwnd is not { } hwnd
+                || (value.IsAvailable && !_tracker.PinTarget(hwnd, _settings.BrowserProcessNames))
+                || (!value.IsAvailable && _tracker.PinnedHwnd != hwnd))
+            {
+                StatusText = "対象ウィンドウが利用できません。候補を更新しました。";
+                RefreshBrowserTargets();
+                return;
+            }
+
+            SetField(ref _selectedBrowserTarget, value);
+            UpdateTargetBrowserText();
+        }
+    }
 
     public SubtitleEntry? InterimSubtitle
     {
@@ -188,6 +227,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             PostStatus(OcrMissingMessage);
         }
 
+        RefreshBrowserTargets();
+        _browserTargetTimer.Start();
         ApplyScreenMode();
     }
 
@@ -309,8 +350,6 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     private async Task TranslateScreenAsync(ScreenOcrResult result)
     {
-        TargetBrowserText = $"対象: {result.BrowserName}";
-
         var entry = new ScreenTextEntry(result.BrowserName, result.Text, "翻訳中…");
         ScreenTexts.Add(entry);
         while (ScreenTexts.Count > MaxScreenTexts)
@@ -422,7 +461,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>アクティブなブラウザをキャプチャし、英語の問題テキストを抽出して返す（重い処理はプールスレッドで）。</summary>
+    /// <summary>選択中のブラウザをキャプチャし、英語の問題テキストを抽出して返す（重い処理はプールスレッドで）。</summary>
     private async Task<string> CaptureQuestionTextAsync()
     {
         return await Task.Run(async () =>
@@ -479,8 +518,67 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             ApplyScreenMode();
             OnPropertyChanged(nameof(IsContinuous));
             OnPropertyChanged(nameof(ScreenModeText));
+            RefreshBrowserTargets();
             StatusText = "設定を保存しました";
         }
+    }
+
+    private void RefreshBrowserTargets()
+    {
+        BrowserWindowCandidate[] candidates = _tracker.GetCandidates(_settings.BrowserProcessNames).ToArray();
+        var options = candidates.Select(candidate => BrowserWindowOption.From(candidate)).ToList();
+        IntPtr? pinnedHwnd = _tracker.PinnedHwnd;
+        BrowserWindowOption selected = BrowserWindowOption.Automatic;
+
+        if (pinnedHwnd is { } hwnd)
+        {
+            selected = options.FirstOrDefault(option => option.Hwnd == hwnd)
+                ?? new BrowserWindowOption(
+                    hwnd,
+                    _selectedBrowserTarget.ProcessName,
+                    _selectedBrowserTarget.WindowTitle,
+                    IsAutomatic: false,
+                    IsAvailable: false);
+            if (!options.Any(option => option.Hwnd == hwnd))
+            {
+                options.Insert(0, selected);
+            }
+        }
+
+        options.Insert(0, BrowserWindowOption.Automatic);
+        bool targetsChanged = !BrowserTargets.SequenceEqual(options);
+        if (targetsChanged)
+        {
+            BrowserTargets.Clear();
+            foreach (BrowserWindowOption option in options)
+            {
+                BrowserTargets.Add(option);
+            }
+        }
+
+        if (targetsChanged || _selectedBrowserTarget != selected)
+        {
+            _selectedBrowserTarget = selected;
+            OnPropertyChanged(nameof(SelectedBrowserTarget));
+        }
+
+        UpdateTargetBrowserText();
+    }
+
+    private void UpdateTargetBrowserText()
+    {
+        BrowserWindowCandidate? target = _tracker.GetCurrentCandidate(_settings.BrowserProcessNames);
+        if (_tracker.PinnedHwnd is not null)
+        {
+            TargetBrowserText = target is null
+                ? $"固定対象: {_selectedBrowserTarget.ProcessName} — {_selectedBrowserTarget.WindowTitle}（利用不可）"
+                : $"固定対象: {BrowserWindowOption.FormatTarget(target)}";
+            return;
+        }
+
+        TargetBrowserText = target is null
+            ? "自動追従: 対象ブラウザ未検出"
+            : $"自動追従: {BrowserWindowOption.FormatTarget(target)}";
     }
 
     public void AdjustFontSize(double delta)
@@ -521,10 +619,32 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _browserTargetTimer.Stop();
         _hotkey.Dispose();
         _scheduler.Dispose();
         _loopback.Dispose();
         _ = _speech.DisposeAsync();
         PersistDisplaySettings();
     }
+}
+
+public sealed record BrowserWindowOption(
+    IntPtr? Hwnd,
+    string ProcessName,
+    string WindowTitle,
+    bool IsAutomatic,
+    bool IsAvailable)
+{
+    public string DisplayName => IsAutomatic
+        ? "自動追従（前面 / 前回のブラウザ）"
+        : $"{ProcessName} — {(string.IsNullOrWhiteSpace(WindowTitle) ? "タイトルなし" : WindowTitle)}"
+            + (IsAvailable ? $" [{Hwnd!.Value.ToInt64():X}]" : "（利用不可）");
+
+    public static BrowserWindowOption Automatic { get; } = new(null, string.Empty, string.Empty, true, true);
+
+    public static BrowserWindowOption From(BrowserWindowCandidate candidate)
+        => new(candidate.Hwnd, candidate.ProcessName, candidate.WindowTitle, IsAutomatic: false, IsAvailable: true);
+
+    public static string FormatTarget(BrowserWindowCandidate candidate)
+        => $"{candidate.ProcessName} — {(string.IsNullOrWhiteSpace(candidate.WindowTitle) ? "タイトルなし" : candidate.WindowTitle)}";
 }
