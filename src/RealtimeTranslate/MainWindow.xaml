@@ -13,6 +13,16 @@
         <Style TargetType="TextBlock">
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
+        <Style x:Key="CopyHistoryTextMenuItem" TargetType="MenuItem">
+            <Style.Triggers>
+                <Trigger Property="CommandParameter" Value="{x:Null}">
+                    <Setter Property="IsEnabled" Value="False"/>
+                </Trigger>
+                <Trigger Property="CommandParameter" Value="">
+                    <Setter Property="IsEnabled" Value="False"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <DockPanel LastChildFill="True">
@@ -61,8 +71,16 @@
 
             <!-- 音声字幕パネル -->
             <DockPanel Grid.Row="0">
-                <TextBlock DockPanel.Dock="Top" Text="🔊 音声翻訳" Foreground="#9CDCFE"
-                           FontWeight="Bold" Margin="8,6,8,2" FontSize="13"/>
+                <Grid DockPanel.Dock="Top" Margin="8,6,8,2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="🔊 音声翻訳" Foreground="#9CDCFE"
+                               FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
+                    <Button x:Name="SubtitleLatestButton" Grid.Column="1" Content="最新へ戻る"
+                            Padding="8,2" Visibility="Collapsed" Click="OnSubtitleLatest"/>
+                </Grid>
                 <Border DockPanel.Dock="Bottom" Background="#252526" Padding="8,4" Margin="8,2,8,6"
                         BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="3">
                     <StackPanel>
@@ -76,8 +94,15 @@
                 <ListBox x:Name="SubtitleList" ItemsSource="{Binding Subtitles}"
                          Background="#1E1E1E" BorderThickness="0" Margin="8,0"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.CanContentScroll="True"
                          HorizontalContentAlignment="Stretch"
-                         VirtualizingStackPanel.IsVirtualizing="False">
+                         VirtualizingStackPanel.IsVirtualizing="True"
+                         VirtualizingStackPanel.VirtualizationMode="Standard"
+                         VirtualizingPanel.ScrollUnit="Pixel"
+                         PreviewMouseWheel="OnHistoryPreviewMouseWheel"
+                         PreviewKeyDown="OnHistoryPreviewKeyDown"
+                         ScrollBar.Scroll="OnHistoryScrollBarScroll"
+                         ScrollViewer.ScrollChanged="OnSubtitleScrollChanged">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -89,6 +114,16 @@
                         <DataTemplate>
                             <StackPanel HorizontalAlignment="Left"
                                         MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ScrollContentPresenter}}">
+                                <StackPanel.ContextMenu>
+                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                        <MenuItem Header="原文をコピー" CommandParameter="{Binding Original}"
+                                                  Style="{StaticResource CopyHistoryTextMenuItem}"
+                                                  Click="OnCopyHistoryText"/>
+                                        <MenuItem Header="訳文をコピー" CommandParameter="{Binding Translation}"
+                                                  Style="{StaticResource CopyHistoryTextMenuItem}"
+                                                  Click="OnCopyHistoryText"/>
+                                    </ContextMenu>
+                                </StackPanel.ContextMenu>
                                 <TextBlock Text="{Binding Original}" Foreground="#808080" TextWrapping="Wrap"
                                            Visibility="{Binding DataContext.ShowOriginal, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
                                 <TextBlock Text="{Binding Translation}" Foreground="White" TextWrapping="Wrap"/>
@@ -103,13 +138,28 @@
 
             <!-- 画面テキストパネル -->
             <DockPanel Grid.Row="2">
-                <TextBlock DockPanel.Dock="Top" Text="🖥 画面テキスト" Foreground="#9CDCFE"
-                           FontWeight="Bold" Margin="8,6,8,2" FontSize="13"/>
+                <Grid DockPanel.Dock="Top" Margin="8,6,8,2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="🖥 画面テキスト" Foreground="#9CDCFE"
+                               FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
+                    <Button x:Name="ScreenLatestButton" Grid.Column="1" Content="最新へ戻る"
+                            Padding="8,2" Visibility="Collapsed" Click="OnScreenLatest"/>
+                </Grid>
                 <ListBox x:Name="ScreenList" ItemsSource="{Binding ScreenTexts}"
                          Background="#1E1E1E" BorderThickness="0" Margin="8,0,8,6"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.CanContentScroll="True"
                          HorizontalContentAlignment="Stretch"
-                         VirtualizingStackPanel.IsVirtualizing="False">
+                         VirtualizingStackPanel.IsVirtualizing="True"
+                         VirtualizingStackPanel.VirtualizationMode="Standard"
+                         VirtualizingPanel.ScrollUnit="Pixel"
+                         PreviewMouseWheel="OnHistoryPreviewMouseWheel"
+                         PreviewKeyDown="OnHistoryPreviewKeyDown"
+                         ScrollBar.Scroll="OnHistoryScrollBarScroll"
+                         ScrollViewer.ScrollChanged="OnScreenScrollChanged">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -122,6 +172,16 @@
                             <Border Background="#252526" Padding="8,6" CornerRadius="3" Margin="0,2"
                                     HorizontalAlignment="Left"
                                     MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ScrollContentPresenter}}">
+                                <Border.ContextMenu>
+                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                        <MenuItem Header="原文をコピー" CommandParameter="{Binding Original}"
+                                                  Style="{StaticResource CopyHistoryTextMenuItem}"
+                                                  Click="OnCopyHistoryText"/>
+                                        <MenuItem Header="訳文をコピー" CommandParameter="{Binding Translation}"
+                                                  Style="{StaticResource CopyHistoryTextMenuItem}"
+                                                  Click="OnCopyHistoryText"/>
+                                    </ContextMenu>
+                                </Border.ContextMenu>
                                 <!-- 画面テキストは訳文（日本語）のみ表示。原文は出さない。 -->
                                 <TextBlock Text="{Binding Translation}" Foreground="White" TextWrapping="Wrap"/>
                             </Border>
