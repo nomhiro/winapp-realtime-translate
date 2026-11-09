@@ -37,11 +37,19 @@ GUI の場合: 設定 → 時刻と言語 → 言語と地域 → 「English (Un
 | --- | --- | --- |
 | **Speech**（Azure AI Speech） | 音声認識＋翻訳 | 必須（音声機能を使う場合） |
 | **Translator**（Azure AI Translator） | 画面テキスト翻訳（既定エンジン） | 必須（画面機能を使う場合） |
-| **Azure OpenAI** ＋ `gpt-4.1` デプロイ | 画面翻訳の高品質モード | 任意 |
+| **Azure OpenAI** ＋対応モデルのデプロイ | 画面翻訳・AI回答 | 任意 |
 
-> 画面翻訳の既定は低遅延の **Azure Translator**。OCR 誤認識の文脈補正やより自然な訳が必要なときだけ、
-> 設定で **Azure OpenAI（既定モデル `gpt-4.1`）** に切り替えます。翻訳に推論は不要なため、推論モデル
-> （gpt-5 系・o 系）は遅延が増えるだけで採用していません。
+> 画面翻訳の既定は **Azure Translator**。OCR 誤認識の文脈補正やより自然な訳が必要なときだけ、
+> 設定で **Azure OpenAI** に切り替えます。既定のモデルプロファイルは従来どおり `gpt-4.1` です。
+> GPT-5.x / GPT-6 の推論モデルも選択でき、画面翻訳と AI 回答の両方で Responses API を使います。
+> モデルプロファイルは API とパラメーターを明示的に選ぶための設定で、任意の Azure デプロイ名から推測されません。
+> 推論設定はモデル既定を使い、Responses API の応答上限は推論トークンを含め 8192 トークンです。
+> 推論トークンも出力として課金されるため、推論プロファイルでは初回応答までの時間や利用料が増えることがあります。
+> モデルのリージョン提供状況・クォータ・価格はデプロイにより異なります。利用するプロファイルとデプロイ先を一致させてください。
+>
+> 選択できる推論モデルプロファイル（[Microsoft Learn の対応表](https://learn.microsoft.com/azure/foundry/openai/how-to/reasoning)）:
+> - GPT-5.x: `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.4-nano`, `gpt-5.4-mini`, `gpt-5.4-pro`, `gpt-5.4`, `gpt-5.3-codex`, `gpt-5.2-codex`, `gpt-5.2`, `gpt-5.1-codex-max`, `gpt-5.1`, `gpt-5.1-chat`, `gpt-5.1-codex`, `gpt-5.1-codex-mini`, `gpt-5-pro`, `gpt-5-codex`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`
+> - GPT-6: `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-6.1-sol`, `gpt-6.1-terra`
 
 ## ビルドと実行
 
@@ -77,8 +85,9 @@ dotnet publish src/RealtimeTranslate -c Release -r win-x64 --self-contained true
 1. アプリ起動後、ツールバーの **設定** を開く。
 2. **Azure Speech** のキー・リージョンを入力。
 3. **Azure Translator** のキー・リージョンを入力。
-4. （任意）高品質モードを使う場合は **Azure OpenAI** のエンドポイント・キー・デプロイ名（`gpt-4.1`）を入力し、
-   「翻訳エンジン」を OpenAI に変更。
+4. （任意）**Azure OpenAI** のエンドポイント・キー・モデルプロファイル・デプロイ名を入力します。
+   モデルプロファイルは実際にデプロイしたモデルに合わせてください。画面翻訳に使う場合は「翻訳エンジン」を OpenAI に変更。
+   既定の `gpt-4.1` は既存動作と互換性があり、GPT-5.x / GPT-6 では Responses API を使用します。
 5. 保存。キーは **DPAPI（現在のユーザー）で暗号化**して
    `%APPDATA%\RealtimeTranslate\settings.dat` に保存されます（平文で残りません）。
 
@@ -122,6 +131,8 @@ $env:RT_TRANSLATOR_KEY='<translator-key>'; $env:RT_TRANSLATOR_REGION='japaneast'
 - 画面キャプチャは対象ウィンドウ単位（`PrintWindow`）で、アプリ自身や他ウィンドウの重なりは拾いません。
   一部の保護コンテンツ（DRM 等）は黒画像になることがあります。
 - クラウド API の利用には費用が発生します。常時自動モードは差分検出で呼び出しを抑制しています。
+- Azure OpenAI の推論プロファイルは応答に使われない推論トークンも費用に含まれ、処理時間が増える場合があります。
+  設定のプロファイルと Azure のデプロイが一致しない場合、API エラーを画面に表示し、別モデルへは自動で切り替えません。
 
 ## プロジェクト構成
 

@@ -5,14 +5,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Azure.AI.OpenAI;
+using RealtimeTranslate.Config;
+using RealtimeTranslate.Llm;
 using OpenAI.Chat;
 
 namespace RealtimeTranslate.Translation;
 
 /// <summary>
-/// オプションの高品質エンジン。Azure OpenAI の LLM（既定 gpt-4.1）で英→日翻訳する。
-/// OCR の軽微な誤認識を文脈で補正でき、より自然な訳になる。翻訳は推論不要のため非推論モデルを使い、
-/// トークンをストリーミングで受け取って逐次表示する。
+/// オプションの高品質エンジン。Azure OpenAI で英→日翻訳する。
+/// GPT-4.1 は既存の Chat Completions API、それ以外の選択済みプロファイルは Responses API を使う。
 /// </summary>
 public sealed class AzureOpenAITranslatorService : ITextTranslator
 {
@@ -21,12 +22,29 @@ public sealed class AzureOpenAITranslatorService : ITextTranslator
         "The input may come from OCR and contain minor recognition errors — infer the intended words from context. " +
         "Output only the Japanese translation with no explanations, notes, or quotation marks.";
 
-    private readonly ChatClient _chatClient;
+    private readonly ChatClient? _chatClient;
+    private readonly AzureOpenAIResponsesClient? _responsesClient;
 
-    public AzureOpenAITranslatorService(string endpoint, string key, string deployment)
+    public AzureOpenAITranslatorService(
+        string endpoint,
+        string key,
+        string deployment,
+        AzureOpenAIModelProfile modelProfile = AzureOpenAIModelProfile.Gpt41)
     {
-        var client = new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(key));
-        _chatClient = client.GetChatClient(deployment);
+        if (!AzureOpenAIModelProfiles.IsSupported(modelProfile))
+        {
+            throw new ArgumentOutOfRangeException(nameof(modelProfile), "Unsupported Azure OpenAI model profile.");
+        }
+
+        if (AzureOpenAIModelProfiles.UsesResponsesApi(modelProfile))
+        {
+            _responsesClient = new AzureOpenAIResponsesClient(endpoint, key, deployment);
+        }
+        else
+        {
+            var client = new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(key));
+            _chatClient = client.GetChatClient(deployment);
+        }
     }
 
     private static ChatCompletionOptions Options => new() { Temperature = 0.2f };
@@ -59,8 +77,19 @@ public sealed class AzureOpenAITranslatorService : ITextTranslator
             yield break;
         }
 
+        if (_responsesClient is not null)
+        {
+            await foreach (string delta in
+                _responsesClient.StreamTextAsync(SystemPrompt, text, cancellationToken).ConfigureAwait(false))
+            {
+                yield return delta;
+            }
+
+            yield break;
+        }
+
         await foreach (StreamingChatCompletionUpdate update in
-            _chatClient.CompleteChatStreamingAsync(BuildMessages(text), Options, cancellationToken).ConfigureAwait(false))
+            _chatClient!.CompleteChatStreamingAsync(BuildMessages(text), Options, cancellationToken).ConfigureAwait(false))
         {
             foreach (ChatMessageContentPart part in update.ContentUpdate)
             {

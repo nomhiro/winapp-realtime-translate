@@ -43,8 +43,11 @@ public sealed class AppSettings
     public string OpenAIEndpoint { get; set; } = "";
     public string OpenAIKey { get; set; } = "";
 
-    /// <summary>デプロイ名。既定は gpt-4.1（高品質モード向け）。</summary>
+    /// <summary>Azure 上の任意のデプロイ名。モデルプロファイルから推測しない。</summary>
     public string OpenAIDeployment { get; set; } = "gpt-4.1";
+
+    /// <summary>API とパラメーター選択用の実モデルプロファイル。旧設定との互換性を保つため gpt-4.1 が既定。</summary>
+    public AzureOpenAIModelProfile OpenAIModelProfile { get; set; } = AzureOpenAIModelProfile.Gpt41;
 
     // --- 言語（英→日固定だが将来拡張のため保持） ---
     public string SourceLanguage { get; set; } = "en";

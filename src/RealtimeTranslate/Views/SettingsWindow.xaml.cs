@@ -29,6 +29,13 @@ public partial class SettingsWindow : Window
 
         EngineCombo.ItemsSource = Enum.GetValues<ScreenTranslationEngine>();
         ModeCombo.ItemsSource = Enum.GetValues<ScreenCaptureMode>();
+        OpenAIProfileCombo.ItemsSource = AzureOpenAIModelProfiles.All
+            .Select(profile => new
+            {
+                Value = profile,
+                Label = AzureOpenAIModelProfiles.GetDisplayName(profile),
+            })
+            .ToList();
         BrowserNamesBox.Text = string.Join(", ", _working.BrowserProcessNames);
         HotkeyKeyBox.Text = VirtualKeyToChar(_working.HotkeyVirtualKey);
     }
