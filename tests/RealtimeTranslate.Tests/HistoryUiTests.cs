@@ -301,12 +301,52 @@ public sealed class HistoryUiTests : IClassFixture<HistoryUiFixture>
         }));
     }
 
-    [Fact]
-    public void ExpandingToShowTheEntireHistoryResumesFollowing()
+    [Theory]
+    [InlineData(600)]
+    [InlineData(768)]
+    [InlineData(788)]
+    [InlineData(1200)]
+    public void ExpandingToShowTheEntireHistoryResumesFollowing(double maximumWindowHeight)
     {
         _fixture.Run(() => WithWindow(h =>
         {
-            for (int i = 0; i < 7; i++)
+            h.Window.MaxHeight = maximumWindowHeight;
+            h.Window.Height = h.Window.MinHeight;
+            for (int i = 0; i < 4; i++)
+            {
+                h.ViewModel.Subtitles.Add(new SubtitleEntry($"original {i}", $"translation {i}"));
+                h.ViewModel.ScreenTexts.Add(new ScreenTextEntry("browser", $"original {i}", $"translation {i}"));
+            }
+            h.Flush();
+            double initialWindowHeight = h.Window.ActualHeight;
+            Assert.True(h.SubtitleScroll.ScrollableHeight > 0);
+            Assert.True(h.ScreenScroll.ScrollableHeight > 0);
+            h.SubtitleScroll.ScrollToTop();
+            h.ScreenScroll.ScrollToTop();
+            h.Flush();
+            Assert.Equal(Visibility.Visible, h.SubtitleLatest.Visibility);
+            Assert.Equal(Visibility.Visible, h.ScreenLatest.Visibility);
+
+            h.ViewModel.FontSize = 10;
+            h.ViewModel.ShowOriginal = false;
+            h.Window.Height = 1200;
+            h.Flush();
+            Assert.True(h.Window.ActualHeight > initialWindowHeight);
+            Assert.Equal(0, h.SubtitleScroll.ScrollableHeight);
+            Assert.Equal(0, h.ScreenScroll.ScrollableHeight);
+            Assert.Equal(Visibility.Collapsed, h.SubtitleLatest.Visibility);
+            Assert.Equal(Visibility.Collapsed, h.ScreenLatest.Visibility);
+        }));
+    }
+
+    [Fact]
+    public void ExpandingWhileHistoryStillOverflowsKeepsFollowingPaused()
+    {
+        _fixture.Run(() => WithWindow(h =>
+        {
+            h.Window.MaxHeight = 768;
+            h.Window.Height = h.Window.MinHeight;
+            for (int i = 0; i < 20; i++)
             {
                 h.ViewModel.Subtitles.Add(new SubtitleEntry($"original {i}", $"translation {i}"));
                 h.ViewModel.ScreenTexts.Add(new ScreenTextEntry("browser", $"original {i}", $"translation {i}"));
@@ -322,10 +362,10 @@ public sealed class HistoryUiTests : IClassFixture<HistoryUiFixture>
             h.ViewModel.ShowOriginal = false;
             h.Window.Height = 1200;
             h.Flush();
-            Assert.Equal(0, h.SubtitleScroll.ScrollableHeight);
-            Assert.Equal(0, h.ScreenScroll.ScrollableHeight);
-            Assert.Equal(Visibility.Collapsed, h.SubtitleLatest.Visibility);
-            Assert.Equal(Visibility.Collapsed, h.ScreenLatest.Visibility);
+            Assert.True(h.SubtitleScroll.ScrollableHeight > 0);
+            Assert.True(h.ScreenScroll.ScrollableHeight > 0);
+            Assert.Equal(Visibility.Visible, h.SubtitleLatest.Visibility);
+            Assert.Equal(Visibility.Visible, h.ScreenLatest.Visibility);
         }));
     }
 
