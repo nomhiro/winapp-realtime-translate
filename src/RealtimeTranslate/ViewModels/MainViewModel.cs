@@ -396,9 +396,17 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         if (s.ScreenEngine == ScreenTranslationEngine.OpenAI &&
             !string.IsNullOrWhiteSpace(s.OpenAIEndpoint) &&
-            !string.IsNullOrWhiteSpace(s.OpenAIKey))
+            !string.IsNullOrWhiteSpace(s.OpenAIKey) &&
+            !string.IsNullOrWhiteSpace(s.OpenAIDeployment))
         {
-            return new AzureOpenAITranslatorService(s.OpenAIEndpoint, s.OpenAIKey, s.OpenAIDeployment);
+            return new AzureOpenAITranslatorService(
+                s.OpenAIEndpoint, s.OpenAIKey, s.OpenAIDeployment, s.OpenAIModelProfile);
+        }
+
+        if (s.ScreenEngine == ScreenTranslationEngine.OpenAI)
+        {
+            throw new InvalidOperationException(
+                "Azure OpenAI 翻訳を選択していますが、エンドポイント・キー・デプロイ名が設定されていません。設定を確認してください。");
         }
 
         return new AzureTranslatorService(s.TranslatorKey, s.TranslatorRegion, s.SourceLanguage, s.TargetLanguage);
@@ -500,7 +508,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     private QuestionAnswerService GetAnswerService()
     {
-        _answerService ??= new QuestionAnswerService(_settings.OpenAIEndpoint, _settings.OpenAIKey, _settings.OpenAIDeployment);
+        _answerService ??= new QuestionAnswerService(
+            _settings.OpenAIEndpoint,
+            _settings.OpenAIKey,
+            _settings.OpenAIDeployment,
+            _settings.OpenAIModelProfile);
         return _answerService;
     }
 

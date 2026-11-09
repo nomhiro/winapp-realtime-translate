@@ -1,7 +1,7 @@
 <Window x:Class="RealtimeTranslate.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="設定 - リアルタイム翻訳" Height="640" Width="560"
+        Title="設定 - リアルタイム翻訳" Height="700" Width="560"
         WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
         FontFamily="Yu Gothic UI" FontSize="13">
     <DockPanel Margin="12">
@@ -69,7 +69,7 @@
                 </GroupBox>
 
                 <!-- Azure OpenAI -->
-                <GroupBox Header="Azure OpenAI（高品質モード・オプション）" Padding="8" Margin="0,0,0,8">
+                <GroupBox Header="Azure OpenAI（画面翻訳・AI回答）" Padding="8" Margin="0,0,0,8">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="140"/>
@@ -79,13 +79,27 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="エンドポイント" VerticalAlignment="Center" Margin="0,4"/>
                         <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding OpenAIEndpoint, UpdateSourceTrigger=PropertyChanged}" Margin="0,4"/>
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="キー" VerticalAlignment="Center" Margin="0,4"/>
                         <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding OpenAIKey, UpdateSourceTrigger=PropertyChanged}" Margin="0,4"/>
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="デプロイ名" VerticalAlignment="Center" Margin="0,4"/>
-                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding OpenAIDeployment, UpdateSourceTrigger=PropertyChanged}" Margin="0,4"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="モデルプロファイル" VerticalAlignment="Center" Margin="0,4"/>
+                        <ComboBox x:Name="OpenAIProfileCombo" Grid.Row="2" Grid.Column="1" Margin="0,4"
+                                  SelectedValuePath="Value" SelectedValue="{Binding OpenAIModelProfile}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Label}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Azure デプロイ名" VerticalAlignment="Center" Margin="0,4"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding OpenAIDeployment, UpdateSourceTrigger=PropertyChanged}" Margin="0,4"/>
+                        <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,6,0,0"
+                                   TextWrapping="Wrap" Foreground="Gray"
+                                   Text="プロファイルはAPIとパラメーターを選びます。任意のAzureデプロイ名からモデルを推測しません。GPT-5.x/GPT-6はモデル既定の推論設定を使い、応答上限は推論トークンを含め8192トークンです。推論トークンは追加の遅延・費用につながることがあります。"/>
                     </Grid>
                 </GroupBox>
 

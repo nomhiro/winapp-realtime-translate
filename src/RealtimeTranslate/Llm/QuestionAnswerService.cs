@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Azure.AI.OpenAI;
+using RealtimeTranslate.Config;
 using OpenAI.Chat;
 
 namespace RealtimeTranslate.Llm;
@@ -23,12 +24,29 @@ public sealed class QuestionAnswerService
         "■理由: （なぜそれが正しいと考えられるかを2〜4文で）\n" +
         "情報が不足して断定できない場合は、最も可能性が高い答えを推測として示し、その旨を理由に書いてください。";
 
-    private readonly ChatClient _chatClient;
+    private readonly ChatClient? _chatClient;
+    private readonly AzureOpenAIResponsesClient? _responsesClient;
 
-    public QuestionAnswerService(string endpoint, string key, string deployment)
+    public QuestionAnswerService(
+        string endpoint,
+        string key,
+        string deployment,
+        AzureOpenAIModelProfile modelProfile = AzureOpenAIModelProfile.Gpt41)
     {
-        var client = new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(key));
-        _chatClient = client.GetChatClient(deployment);
+        if (!AzureOpenAIModelProfiles.IsSupported(modelProfile))
+        {
+            throw new ArgumentOutOfRangeException(nameof(modelProfile), "Unsupported Azure OpenAI model profile.");
+        }
+
+        if (AzureOpenAIModelProfiles.UsesResponsesApi(modelProfile))
+        {
+            _responsesClient = new AzureOpenAIResponsesClient(endpoint, key, deployment);
+        }
+        else
+        {
+            var client = new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(key));
+            _chatClient = client.GetChatClient(deployment);
+        }
     }
 
     public async IAsyncEnumerable<string> AnswerStreamAsync(
@@ -45,15 +63,22 @@ public sealed class QuestionAnswerService
             (string.IsNullOrWhiteSpace(audioContext) ? "" : $"【音声の内容】\n{audioContext}\n\n") +
             $"【画面の問題テキスト】\n{questionText}";
 
-        var messages = new ChatMessage[]
+        if (_responsesClient is not null)
         {
-            new SystemChatMessage(SystemPrompt),
-            new UserChatMessage(userContent),
-        };
+            await foreach (string delta in
+                _responsesClient.StreamTextAsync(SystemPrompt, userContent, cancellationToken).ConfigureAwait(false))
+            {
+                yield return delta;
+            }
+
+            yield break;
+        }
+
+        var messages = new ChatMessage[] { new SystemChatMessage(SystemPrompt), new UserChatMessage(userContent) };
         var options = new ChatCompletionOptions { Temperature = 0.3f };
 
         await foreach (StreamingChatCompletionUpdate update in
-            _chatClient.CompleteChatStreamingAsync(messages, options, cancellationToken).ConfigureAwait(false))
+            _chatClient!.CompleteChatStreamingAsync(messages, options, cancellationToken).ConfigureAwait(false))
         {
             foreach (ChatMessageContentPart part in update.ContentUpdate)
             {
