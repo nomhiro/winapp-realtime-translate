@@ -12,7 +12,7 @@
 ## 動作環境
 
 - Windows 10 (1903 / build 18362) 以降 / Windows 11
-- [.NET 9 ランタイム](https://dotnet.microsoft.com/download/dotnet/9.0)（ビルドには .NET 9 SDK）
+- ソースからビルドする場合は [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)。GitHub Releases の自己完結版は .NET ランタイムの追加インストール不要
 - **英語OCR言語パック**（画面テキスト翻訳に必須）。日本語版 Windows では未導入の場合があります。
 
 ### 英語OCRのインストール（画面翻訳が動かない場合）
@@ -60,8 +60,17 @@ dotnet test RealtimeTranslate.sln
 
 ```powershell
 dotnet publish src/RealtimeTranslate -c Release -r win-x64 --self-contained true `
-  -p:PublishSingleFile=true
+  -o publish
 ```
+
+## GitHub Releases から入手する（Windows x64）
+
+`main` へのマージ後、Windows 向け自己完結版が [GitHub Releases](https://github.com/nomhiro/winapp-realtime-translate/releases) に公開されます。PR では Windows 上の Release ビルドとテストが実行され、失敗した場合は公開されません。バージョンは `v0.1.<連番>` で、ZIP 名と Release に同じバージョンおよび対象コミットが記録されます。
+
+1. Release の `RealtimeTranslate-v0.1.x-win-x64.zip` をダウンロードし、フォルダーへ展開します。ZIP 内のファイル一式を同じフォルダーに保ってください。
+2. `RealtimeTranslate.exe` を起動します。.NET ランタイムは同梱されています。未署名のため、初回起動時に Windows のセキュリティ警告が表示されることがあります。
+3. 画面翻訳には英語 OCR 言語パックが必要です（上記の手順を参照）。音声・画面翻訳を使う場合は、自分の Azure 資格情報をアプリの設定に入力してください。資格情報やユーザー設定は配布物に含まれません。
+4. 更新時は新しい Release の ZIP をダウンロードし、別のフォルダーに展開して起動します。設定は `%APPDATA%\RealtimeTranslate\settings.dat` に保存されるため、更新で引き継がれます。
 
 ## 初回設定
 
