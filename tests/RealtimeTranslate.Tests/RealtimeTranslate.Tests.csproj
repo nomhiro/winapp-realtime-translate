@@ -3,6 +3,7 @@
   <PropertyGroup>
     <!-- メインプロジェクト(net9.0-windows10.0.19041.0)を参照するため TFM を揃える -->
     <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
