@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
@@ -76,7 +77,7 @@ public sealed class WindowsMediaOcrService : IOcrService
 
         using SoftwareBitmap softwareBitmap = ToSoftwareBitmap(bitmap, (int)OcrEngine.MaxImageDimension);
         OcrResult result = await _engine.RecognizeAsync(softwareBitmap);
-        return result.Text ?? string.Empty;
+        return string.Join("\n", result.Lines.Select(line => line.Text));
     }
 
     /// <summary>
