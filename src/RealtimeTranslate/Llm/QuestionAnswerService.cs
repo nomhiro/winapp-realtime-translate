@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Azure;
 using Azure.AI.OpenAI;
 using RealtimeTranslate.Config;
+using RealtimeTranslate.Translation;
 using OpenAI.Chat;
 
 namespace RealtimeTranslate.Llm;
@@ -26,12 +27,15 @@ public sealed class QuestionAnswerService
 
     private readonly ChatClient? _chatClient;
     private readonly AzureOpenAIResponsesClient? _responsesClient;
+    private readonly IModelUsageObserver? _usageObserver;
+    private readonly AzureOpenAIModelProfile _modelProfile;
 
     public QuestionAnswerService(
         string endpoint,
         string key,
         string deployment,
-        AzureOpenAIModelProfile modelProfile = AzureOpenAIModelProfile.Gpt41)
+        AzureOpenAIModelProfile modelProfile = AzureOpenAIModelProfile.Gpt41,
+        IModelUsageObserver? usageObserver = null)
     {
         if (!AzureOpenAIModelProfiles.IsSupported(modelProfile))
         {
@@ -47,6 +51,9 @@ public sealed class QuestionAnswerService
             var client = new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(key));
             _chatClient = client.GetChatClient(deployment);
         }
+
+        _usageObserver = usageObserver;
+        _modelProfile = modelProfile;
     }
 
     public async IAsyncEnumerable<string> AnswerStreamAsync(
@@ -65,8 +72,13 @@ public sealed class QuestionAnswerService
 
         if (_responsesClient is not null)
         {
-            await foreach (string delta in
-                _responsesClient.StreamTextAsync(SystemPrompt, userContent, cancellationToken).ConfigureAwait(false))
+            await foreach (string delta in TrackRequestAsync(
+                _responsesClient.StreamTextAsync(
+                    SystemPrompt,
+                    userContent,
+                    cancellationToken,
+                    (input, output) => _usageObserver?.OnModelTokensUsed(_modelProfile, input, output)),
+                cancellationToken).ConfigureAwait(false))
             {
                 yield return delta;
             }
@@ -77,8 +89,9 @@ public sealed class QuestionAnswerService
         var messages = new ChatMessage[] { new SystemChatMessage(SystemPrompt), new UserChatMessage(userContent) };
         var options = new ChatCompletionOptions { Temperature = 0.3f };
 
-        await foreach (StreamingChatCompletionUpdate update in
-            _chatClient!.CompleteChatStreamingAsync(messages, options, cancellationToken).ConfigureAwait(false))
+        await foreach (StreamingChatCompletionUpdate update in TrackRequestAsync(
+            ReadChatUpdatesAsync(messages, options, cancellationToken),
+            cancellationToken).ConfigureAwait(false))
         {
             foreach (ChatMessageContentPart part in update.ContentUpdate)
             {
@@ -87,6 +100,52 @@ public sealed class QuestionAnswerService
                     yield return part.Text;
                 }
             }
+        }
+    }
+
+    private async IAsyncEnumerable<StreamingChatCompletionUpdate> ReadChatUpdatesAsync(
+        ChatMessage[] messages,
+        ChatCompletionOptions options,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await foreach (StreamingChatCompletionUpdate update in
+            _chatClient!.CompleteChatStreamingAsync(messages, options, cancellationToken).ConfigureAwait(false))
+        {
+            if (update.Usage is { } usage)
+            {
+                _usageObserver?.OnModelTokensUsed(
+                    _modelProfile,
+                    usage.InputTokenCount,
+                    usage.OutputTokenCount);
+            }
+
+            yield return update;
+        }
+    }
+
+    private async IAsyncEnumerable<T> TrackRequestAsync<T>(
+        IAsyncEnumerable<T> stream,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        _usageObserver?.OnModelRequestStarted();
+        bool succeeded = false;
+        try
+        {
+            await foreach (T item in stream.WithCancellation(cancellationToken).ConfigureAwait(false))
+            {
+                yield return item;
+            }
+
+            succeeded = true;
+        }
+        finally
+        {
+            TranslationRequestOutcome outcome = succeeded
+                ? TranslationRequestOutcome.Succeeded
+                : cancellationToken.IsCancellationRequested
+                    ? TranslationRequestOutcome.Canceled
+                    : TranslationRequestOutcome.Failed;
+            _usageObserver?.OnModelRequestCompleted(outcome);
         }
     }
 }

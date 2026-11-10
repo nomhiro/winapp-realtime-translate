@@ -36,7 +36,8 @@ internal sealed class AzureOpenAIResponsesClient
     internal async IAsyncEnumerable<string> StreamTextAsync(
         string instructions,
         string input,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default,
+        Action<int, int>? usageCallback = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, _responsesUri);
         request.Headers.Add("api-key", _key);
@@ -62,7 +63,7 @@ internal sealed class AzureOpenAIResponsesClient
         }
 
         await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        await foreach (string delta in ReadTextDeltasAsync(stream, cancellationToken).ConfigureAwait(false))
+        await foreach (string delta in ReadTextDeltasAsync(stream, cancellationToken, usageCallback).ConfigureAwait(false))
         {
             yield return delta;
         }
@@ -96,7 +97,8 @@ internal sealed class AzureOpenAIResponsesClient
 
     internal static async IAsyncEnumerable<string> ReadTextDeltasAsync(
         Stream stream,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default,
+        Action<int, int>? usageCallback = null)
     {
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
         var data = new StringBuilder();
@@ -113,6 +115,11 @@ internal sealed class AzureOpenAIResponsesClient
                     if (parsed.Error is not null)
                     {
                         throw new InvalidOperationException(parsed.Error);
+                    }
+
+                    if (parsed.InputTokens is int inputTokens && parsed.OutputTokens is int outputTokens)
+                    {
+                        usageCallback?.Invoke(inputTokens, outputTokens);
                     }
 
                     completed |= parsed.Completed;
@@ -148,6 +155,11 @@ internal sealed class AzureOpenAIResponsesClient
                 throw new InvalidOperationException(parsed.Error);
             }
 
+            if (parsed.InputTokens is int inputTokens && parsed.OutputTokens is int outputTokens)
+            {
+                usageCallback?.Invoke(inputTokens, outputTokens);
+            }
+
             completed |= parsed.Completed;
             if (!string.IsNullOrEmpty(parsed.TextDelta))
             {
@@ -166,7 +178,7 @@ internal sealed class AzureOpenAIResponsesClient
     {
         if (data == "[DONE]")
         {
-            return new StreamEvent(null, true, null);
+            return new StreamEvent(null, true, null, null, null);
         }
 
         try
@@ -177,11 +189,12 @@ internal sealed class AzureOpenAIResponsesClient
 
             if (type == "response.output_text.delta")
             {
-                return new StreamEvent(GetString(root, "delta"), false, null);
+                return new StreamEvent(GetString(root, "delta"), false, null, null, null);
             }
 
             if (type is "error" or "response.failed")
             {
+                JsonElement response = GetNested(root, "response");
                 JsonElement error = GetNested(root, "response", "error");
                 if (error.ValueKind == JsonValueKind.Undefined)
                 {
@@ -190,21 +203,26 @@ internal sealed class AzureOpenAIResponsesClient
 
                 string code = GetString(error, "code") ?? "request_failed";
                 string message = GetString(error, "message") ?? "The model request failed.";
-                return new StreamEvent(null, false, $"Azure OpenAI Responses API error ({code}): {message}");
+                (int? input, int? output) = ReadUsage(GetNested(response, "usage"));
+                return new StreamEvent(
+                    null, false, $"Azure OpenAI Responses API error ({code}): {message}", input, output);
             }
 
             if (type == "response.incomplete")
             {
-                return new StreamEvent(null, false, GetIncompleteMessage(GetNested(root, "response")));
+                JsonElement response = GetNested(root, "response");
+                (int? input, int? output) = ReadUsage(GetNested(response, "usage"));
+                return new StreamEvent(null, false, GetIncompleteMessage(response), input, output);
             }
 
             if (type == "response.completed")
             {
                 JsonElement response = GetNested(root, "response");
+                (int? input, int? output) = ReadUsage(GetNested(response, "usage"));
                 string? status = GetString(response, "status");
                 if (status == "incomplete")
                 {
-                    return new StreamEvent(null, false, GetIncompleteMessage(response));
+                    return new StreamEvent(null, false, GetIncompleteMessage(response), input, output);
                 }
 
                 if (status == "failed")
@@ -212,27 +230,43 @@ internal sealed class AzureOpenAIResponsesClient
                     JsonElement error = GetNested(response, "error");
                     string code = GetString(error, "code") ?? "request_failed";
                     string message = GetString(error, "message") ?? "The model request failed.";
-                    return new StreamEvent(null, false, $"Azure OpenAI Responses API error ({code}): {message}");
+                    return new StreamEvent(
+                        null, false, $"Azure OpenAI Responses API error ({code}): {message}", input, output);
                 }
 
                 if (status == "cancelled")
                 {
-                    return new StreamEvent(null, false, "Azure OpenAI Responses API request was cancelled before completion.");
+                    return new StreamEvent(
+                        null, false,
+                        "Azure OpenAI Responses API request was cancelled before completion.",
+                        input,
+                        output);
                 }
 
-                return new StreamEvent(null, true, null);
+                return new StreamEvent(null, true, null, input, output);
             }
 
-            return new StreamEvent(null, false, null);
+            return new StreamEvent(null, false, null, null, null);
         }
         catch (JsonException)
         {
-            return new StreamEvent(
-                null,
-                false,
-                "Azure OpenAI Responses API returned an invalid streaming event.");
+            return new StreamEvent(null, false, "Azure OpenAI Responses API returned an invalid streaming event.", null, null);
         }
     }
+
+    private static (int? Input, int? Output) ReadUsage(JsonElement usage)
+    {
+        int? input = GetInt32(usage, "input_tokens");
+        int? output = GetInt32(usage, "output_tokens");
+        return input is not null && output is not null ? (input, output) : (null, null);
+    }
+
+    private static int? GetInt32(JsonElement element, string property)
+        => element.ValueKind == JsonValueKind.Object &&
+           element.TryGetProperty(property, out JsonElement value) &&
+           value.TryGetInt32(out int count)
+            ? count
+            : null;
 
     private static InvalidOperationException CreateHttpException(
         System.Net.HttpStatusCode statusCode,
@@ -287,5 +321,10 @@ internal sealed class AzureOpenAIResponsesClient
             ? value.GetString()
             : null;
 
-    private readonly record struct StreamEvent(string? TextDelta, bool Completed, string? Error);
+    private readonly record struct StreamEvent(
+        string? TextDelta,
+        bool Completed,
+        string? Error,
+        int? InputTokens,
+        int? OutputTokens);
 }

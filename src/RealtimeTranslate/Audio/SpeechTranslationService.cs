@@ -21,6 +21,8 @@ public sealed class SpeechTranslationService : IAsyncDisposable
     public event EventHandler<TranslationUpdate>? Result;
     public event EventHandler<string>? Error;
     public event EventHandler<bool>? RunningChanged;
+    public event Action<int>? AudioBytesWritten;
+    public event EventHandler? SessionStarted;
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private PushAudioInputStream? _pushStream;
@@ -72,12 +74,21 @@ public sealed class SpeechTranslationService : IAsyncDisposable
     {
         try
         {
-            _pushStream?.Write(pcm);
+            PushAudioInputStream? stream = _pushStream;
+            if (stream is null)
+            {
+                return;
+            }
+
+            stream.Write(pcm);
         }
         catch
         {
             // ストリームが再構築中などのタイミングは無視（次チャンクで復帰）
+            return;
         }
+
+        AudioBytesWritten?.Invoke(pcm.Length);
     }
 
     private async Task StartRecognizerAsync(AppSettings settings)
@@ -100,6 +111,7 @@ public sealed class SpeechTranslationService : IAsyncDisposable
         _recognizer.Canceled += OnCanceled;
 
         await _recognizer.StartContinuousRecognitionAsync().ConfigureAwait(false);
+        SessionStarted?.Invoke(this, EventArgs.Empty);
         _reconnectAttempt = 0;
     }
 

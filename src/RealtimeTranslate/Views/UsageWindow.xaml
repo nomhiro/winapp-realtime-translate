@@ -1,0 +1,134 @@
+<Window x:Class="RealtimeTranslate.Views.UsageWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="利用状況" Height="650" Width="500"
+        MinHeight="420" MinWidth="440"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
+        FontFamily="Yu Gothic UI" FontSize="13">
+    <DockPanel Margin="16">
+        <Button DockPanel.Dock="Bottom" Content="閉じる" Width="90" Height="30"
+                HorizontalAlignment="Right" Margin="0,12,0,0" Click="OnClose"/>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock Text="アプリ起動後の利用状況"
+                           FontSize="16" FontWeight="Bold" Margin="0,0,0,12"/>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="画面翻訳API試行回数" Margin="0,4"/>
+                    <TextBlock x:Name="TotalRequestsText" Grid.Row="0" Grid.Column="1"
+                               Text="{Binding ScreenTranslationUsage.TotalRequests, StringFormat={}{0:N0}}"
+                               FontWeight="Bold" Margin="12,4,0,4"/>
+                    <TextBlock Grid.Row="1" Text="送信した原文の文字数" Margin="0,4"/>
+                    <TextBlock Grid.Row="1" Grid.Column="1"
+                               Text="{Binding ScreenTranslationUsage.TotalInputCharacters, StringFormat={}{0:N0}}"
+                               FontWeight="Bold" Margin="12,4,0,4"/>
+                    <TextBlock Grid.Row="2" Text="Translator課金対象文字数" Margin="0,4"/>
+                    <TextBlock Grid.Row="2" Grid.Column="1"
+                               Text="{Binding ScreenTranslationUsage.TranslatorInputCharacters, StringFormat={}{0:N0}}"
+                               FontWeight="Bold" Margin="12,4,0,4"/>
+                    <TextBlock Grid.Row="3" Text="最終リクエスト" Margin="0,4"/>
+                    <TextBlock Grid.Row="3" Grid.Column="1"
+                               Text="{Binding ScreenTranslationUsage.LastRequestText}" Margin="12,4,0,4"/>
+                    <TextBlock Grid.Row="4" Text="処理中" Margin="0,4"/>
+                    <TextBlock Grid.Row="4" Grid.Column="1"
+                               Text="{Binding ScreenTranslationUsage.InProgressRequests, StringFormat={}{0:N0}}"
+                               Margin="12,4,0,4"/>
+                    <TextBlock Grid.Row="5" Text="画面モード" Margin="0,4"/>
+                    <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding ScreenModeText}" Margin="12,4,0,4"/>
+                    <TextBlock Grid.Row="6" Text="自動確認間隔" Margin="0,4"/>
+                    <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding AutoCaptureIntervalText}" Margin="12,4,0,4"/>
+                </Grid>
+
+                <TextBlock Text="結果" FontWeight="Bold" Margin="0,12,0,2"/>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="成功: "/>
+                    <TextBlock Text="{Binding ScreenTranslationUsage.SuccessfulRequests, StringFormat={}{0:N0}}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="失敗: "/>
+                    <TextBlock Text="{Binding ScreenTranslationUsage.FailedRequests, StringFormat={}{0:N0}}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="キャンセル: "/>
+                    <TextBlock Text="{Binding ScreenTranslationUsage.CanceledRequests, StringFormat={}{0:N0}}"/>
+                </StackPanel>
+
+                <Separator Margin="0,12,0,8"/>
+                <TextBlock Text="音声翻訳" FontWeight="Bold" Margin="0,0,0,4"/>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Speech認識セッション: "/>
+                    <TextBlock Text="{Binding ScreenTranslationUsage.SpeechSessionCount, StringFormat={}{0:N0}}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="送信音声時間: "/>
+                    <TextBlock Text="{Binding ScreenTranslationUsage.SpeechAudioSeconds, StringFormat={}{0:N0}}"/>
+                    <TextBlock Text=" 秒"/>
+                </StackPanel>
+
+                <TextBlock Text="AI / LLM" FontWeight="Bold" Margin="0,12,0,4"/>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="モデル: "/>
+                    <TextBlock Text="{Binding OpenAIModelProfileText}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="リクエスト: "/>
+                    <TextBlock Text="{Binding ScreenTranslationUsage.ModelRequests, StringFormat={}{0:N0}}"/>
+                    <TextBlock Text="　入力: "/>
+                    <TextBlock x:Name="ModelInputTokensText"
+                               Text="{Binding ScreenTranslationUsage.TotalModelInputTokens, StringFormat={}{0:N0}}"/>
+                    <TextBlock Text="　出力: "/>
+                    <TextBlock x:Name="ModelOutputTokensText"
+                               Text="{Binding ScreenTranslationUsage.TotalModelOutputTokens, StringFormat={}{0:N0}}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="成功 / 失敗 / キャンセル: "/>
+                    <TextBlock Text="{Binding ScreenTranslationUsage.ModelSuccessfulRequests, StringFormat={}{0:N0}}"/>
+                    <TextBlock Text=" / "/>
+                    <TextBlock Text="{Binding ScreenTranslationUsage.ModelFailedRequests, StringFormat={}{0:N0}}"/>
+                    <TextBlock Text=" / "/>
+                    <TextBlock Text="{Binding ScreenTranslationUsage.ModelCanceledRequests, StringFormat={}{0:N0}}"/>
+                </StackPanel>
+
+                <TextBlock Text="推定料金 (USD / Global Standard)" FontWeight="Bold" Margin="0,12,0,4"/>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Azure Speech: "/>
+                    <TextBlock Text="{Binding ScreenTranslationUsage.EstimatedSpeechCostText}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Azure Translator: "/>
+                    <TextBlock Text="{Binding ScreenTranslationUsage.EstimatedTranslatorCostText}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Azure OpenAI: "/>
+                    <TextBlock Text="{Binding ScreenTranslationUsage.EstimatedModelCostText}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock Text="合計: " FontWeight="Bold"/>
+                    <TextBlock x:Name="EstimatedTotalCostText"
+                               Text="{Binding ScreenTranslationUsage.EstimatedTotalCostText}" FontWeight="Bold"/>
+                </StackPanel>
+
+                <Separator Margin="0,12,0,8"/>
+                <TextBlock Text="自動モードでは設定した間隔で画面を確認し、画面に変化があった場合に翻訳APIを呼び出します。変化なしやOCRで英語を検出できなかった場合はAPI利用量に含みません。"
+                           TextWrapping="Wrap" Margin="0,0,0,8"/>
+                <TextBlock Text="API開始後の失敗やキャンセルも試行回数に含みます。音声時間はSpeech SDKへ送信できたPCM音声から推定し、LLMトークン数はAPI応答で確認できたusageを集計します。"
+                           TextWrapping="Wrap" Margin="0,0,0,8"/>
+                <TextBlock Text="Azure OpenAIはMicrosoft公開価格のGlobal Standard（2026/11/10確認）を使った概算です。リージョン・契約・無料枠・税・為替・長文コンテキスト料金は反映しません。入力トークンはキャッシュ利用も通常単価で見積もり、Translator無料枠も差し引きません。"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

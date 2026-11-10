@@ -72,7 +72,18 @@
 
         <!-- ステータスバー -->
         <Border DockPanel.Dock="Bottom" Background="#007ACC" Padding="6,3">
-            <TextBlock Text="{Binding StatusText}" Foreground="White" FontSize="12"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding StatusText}" Foreground="White" FontSize="12"
+                           VerticalAlignment="Center"/>
+                <Button x:Name="OpenUsageButton" Grid.Column="1" Content="利用状況" Height="14" MinHeight="0"
+                        Padding="0" Margin="8,0,0,0" BorderThickness="0"
+                        Background="Transparent" Foreground="White" FontSize="11"
+                        VerticalAlignment="Center" Click="OnOpenUsage"/>
+            </Grid>
         </Border>
 
         <!-- 本体: 上=字幕(音声) / 下=画面テキスト -->
