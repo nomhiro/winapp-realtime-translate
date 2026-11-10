@@ -75,6 +75,8 @@ public partial class MainWindow : Window
 
     private void OnOpenSettings(object sender, RoutedEventArgs e) => _viewModel.OpenSettings(this);
 
+    private void OnOpenUsage(object sender, RoutedEventArgs e) => _viewModel.OpenUsage(this);
+
     private void OnClearHistory(object sender, RoutedEventArgs e) => _viewModel.ClearHistory();
 
     private void OnSubtitleLatest(object sender, RoutedEventArgs e)

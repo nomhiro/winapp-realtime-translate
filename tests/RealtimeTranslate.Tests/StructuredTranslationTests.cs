@@ -54,7 +54,48 @@ public class StructuredTranslationTests
             () => translator.TranslateAsync("First sentence.\nSecond sentence."));
     }
 
-    private sealed class RecordingClient(string[] translations) : TextTranslationClient
+    [Fact]
+    public async Task Translator_ReportsOneSuccessfulAttemptAndSubmittedTextCharacters()
+    {
+        var observer = new RecordingRequestObserver();
+        var translator = new AzureTranslatorService(
+            new RecordingClient(["最初", "次"]), "en", "ja", observer);
+
+        await translator.TranslateAsync("First\n \nSecond");
+
+        Assert.Equal([11], observer.StartedCharacterCounts);
+        Assert.Equal([RealtimeTranslate.Translation.TranslationRequestOutcome.Succeeded], observer.Outcomes);
+    }
+
+    [Fact]
+    public async Task Translator_ReportsFailedAndCanceledAttempts()
+    {
+        var failedObserver = new RecordingRequestObserver();
+        var failedTranslator = new AzureTranslatorService(
+            new RecordingClient([], new InvalidOperationException("request failed")), "en", "ja", failedObserver);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => failedTranslator.TranslateAsync("Failure"));
+
+        var canceledObserver = new RecordingRequestObserver();
+        var canceledTranslator = new AzureTranslatorService(
+            new RecordingClient([], new OperationCanceledException()), "en", "ja", canceledObserver);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledTranslator.TranslateAsync("Cancel"));
+
+        Assert.Equal([RealtimeTranslate.Translation.TranslationRequestOutcome.Failed], failedObserver.Outcomes);
+        Assert.Equal([RealtimeTranslate.Translation.TranslationRequestOutcome.Canceled], canceledObserver.Outcomes);
+    }
+
+    [Fact]
+    public async Task Translator_EmptyInputDoesNotStartAnApiAttempt()
+    {
+        var observer = new RecordingRequestObserver();
+        var translator = new AzureTranslatorService(new RecordingClient([]), "en", "ja", observer);
+
+        Assert.Equal(string.Empty, await translator.TranslateAsync(" \r\n "));
+        Assert.Empty(observer.StartedCharacterCounts);
+        Assert.Empty(observer.Outcomes);
+    }
+
+    private sealed class RecordingClient(string[] translations, Exception? exception = null) : TextTranslationClient
     {
         public string[] Input { get; private set; } = [];
         public int Calls { get; private set; }
@@ -69,11 +110,28 @@ public class StructuredTranslationTests
             Assert.Equal("ja", targetLanguage);
             Assert.Equal("en", sourceLanguage);
             Calls++;
+            if (exception is not null)
+            {
+                throw exception;
+            }
+
             Input = content.ToArray();
             IReadOnlyList<TranslatedTextItem> result = translations.Select(text =>
                 TranslationTextModelFactory.TranslatedTextItem(translations:
                     [TranslationTextModelFactory.TranslationText(language: "ja", text: text)])).ToArray();
             return Task.FromResult(Response.FromValue(result, null!));
         }
+    }
+
+    private sealed class RecordingRequestObserver : RealtimeTranslate.Translation.ITranslationRequestObserver
+    {
+        public List<int> StartedCharacterCounts { get; } = [];
+
+        public List<RealtimeTranslate.Translation.TranslationRequestOutcome> Outcomes { get; } = [];
+
+        public void OnRequestStarted(int inputCharacters) => StartedCharacterCounts.Add(inputCharacters);
+
+        public void OnRequestCompleted(RealtimeTranslate.Translation.TranslationRequestOutcome outcome)
+            => Outcomes.Add(outcome);
     }
 }

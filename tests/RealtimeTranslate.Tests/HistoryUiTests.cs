@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using RealtimeTranslate.Config;
 using RealtimeTranslate.Models;
 using RealtimeTranslate.ViewModels;
+using RealtimeTranslate.Views;
 
 namespace RealtimeTranslate.Tests;
 
@@ -169,6 +170,36 @@ public sealed class HistoryUiTests : IClassFixture<HistoryUiFixture>
             h.Flush();
             AssertAtBottom(h.SubtitleScroll);
             AssertAtBottom(h.ScreenScroll);
+        }));
+    }
+
+    [Fact]
+    public void UsageButtonOpensSeparateWindowWithCurrentSessionStats()
+    {
+        _fixture.Run(() => WithWindow(h =>
+        {
+            h.ViewModel.ScreenTranslationUsage.OnRequestStarted(23);
+            h.ViewModel.ScreenTranslationUsage.OnRequestCompleted(
+                RealtimeTranslate.Translation.TranslationRequestOutcome.Succeeded);
+            h.ViewModel.ScreenTranslationUsage.OnModelRequestStarted();
+            h.ViewModel.ScreenTranslationUsage.OnModelTokensUsed(
+                RealtimeTranslate.Config.AzureOpenAIModelProfile.Gpt41,
+                100,
+                20);
+            h.ViewModel.ScreenTranslationUsage.OnModelRequestCompleted(
+                RealtimeTranslate.Translation.TranslationRequestOutcome.Succeeded);
+
+            var openButton = (Button)h.Window.FindName("OpenUsageButton");
+            openButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            h.Flush();
+
+            UsageWindow usageWindow = Assert.Single(h.Window.OwnedWindows.OfType<UsageWindow>());
+            Assert.True(usageWindow.IsVisible);
+            Assert.Same(h.ViewModel, usageWindow.DataContext);
+            Assert.Equal("1", ((TextBlock)usageWindow.FindName("TotalRequestsText")).Text);
+            Assert.Equal("100", ((TextBlock)usageWindow.FindName("ModelInputTokensText")).Text);
+            Assert.StartsWith("US$ ", ((TextBlock)usageWindow.FindName("EstimatedTotalCostText")).Text);
+            usageWindow.Close();
         }));
     }
 

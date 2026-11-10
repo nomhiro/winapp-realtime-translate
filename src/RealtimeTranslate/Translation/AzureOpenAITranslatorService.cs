@@ -26,12 +26,17 @@ public sealed class AzureOpenAITranslatorService : ITextTranslator
 
     private readonly ChatClient? _chatClient;
     private readonly AzureOpenAIResponsesClient? _responsesClient;
+    private readonly ITranslationRequestObserver? _requestObserver;
+    private readonly IModelUsageObserver? _modelUsageObserver;
+    private readonly AzureOpenAIModelProfile _modelProfile;
 
     public AzureOpenAITranslatorService(
         string endpoint,
         string key,
         string deployment,
-        AzureOpenAIModelProfile modelProfile = AzureOpenAIModelProfile.Gpt41)
+        AzureOpenAIModelProfile modelProfile = AzureOpenAIModelProfile.Gpt41,
+        ITranslationRequestObserver? requestObserver = null,
+        IModelUsageObserver? modelUsageObserver = null)
     {
         if (!AzureOpenAIModelProfiles.IsSupported(modelProfile))
         {
@@ -47,6 +52,22 @@ public sealed class AzureOpenAITranslatorService : ITextTranslator
             var client = new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(key));
             _chatClient = client.GetChatClient(deployment);
         }
+
+        _requestObserver = requestObserver;
+        _modelUsageObserver = modelUsageObserver;
+        _modelProfile = modelProfile;
+    }
+
+    internal AzureOpenAITranslatorService(
+        AzureOpenAIResponsesClient responsesClient,
+        ITranslationRequestObserver? requestObserver = null,
+        IModelUsageObserver? modelUsageObserver = null,
+        AzureOpenAIModelProfile modelProfile = AzureOpenAIModelProfile.Gpt41)
+    {
+        _responsesClient = responsesClient;
+        _requestObserver = requestObserver;
+        _modelUsageObserver = modelUsageObserver;
+        _modelProfile = modelProfile;
     }
 
     private static ChatCompletionOptions Options => new() { Temperature = 0.2f };
@@ -82,7 +103,14 @@ public sealed class AzureOpenAITranslatorService : ITextTranslator
         if (_responsesClient is not null)
         {
             await foreach (string delta in
-                _responsesClient.StreamTextAsync(SystemPrompt, text, cancellationToken).ConfigureAwait(false))
+                TrackRequestAsync(
+                    token => _responsesClient.StreamTextAsync(
+                        SystemPrompt,
+                        text,
+                        token,
+                        (input, output) => _modelUsageObserver?.OnModelTokensUsed(_modelProfile, input, output)),
+                    text.Length,
+                    cancellationToken).ConfigureAwait(false))
             {
                 yield return delta;
             }
@@ -91,8 +119,19 @@ public sealed class AzureOpenAITranslatorService : ITextTranslator
         }
 
         await foreach (StreamingChatCompletionUpdate update in
-            _chatClient!.CompleteChatStreamingAsync(BuildMessages(text), Options, cancellationToken).ConfigureAwait(false))
+            TrackRequestAsync(
+                token => _chatClient!.CompleteChatStreamingAsync(BuildMessages(text), Options, token),
+                text.Length,
+                cancellationToken).ConfigureAwait(false))
         {
+            if (update.Usage is { } usage)
+            {
+                _modelUsageObserver?.OnModelTokensUsed(
+                    _modelProfile,
+                    usage.InputTokenCount,
+                    usage.OutputTokenCount);
+            }
+
             foreach (ChatMessageContentPart part in update.ContentUpdate)
             {
                 if (!string.IsNullOrEmpty(part.Text))
@@ -100,6 +139,36 @@ public sealed class AzureOpenAITranslatorService : ITextTranslator
                     yield return part.Text;
                 }
             }
+        }
+    }
+
+    private async IAsyncEnumerable<T> TrackRequestAsync<T>(
+        Func<CancellationToken, IAsyncEnumerable<T>> sendRequest,
+        int inputCharacters,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        _requestObserver?.OnRequestStarted(inputCharacters, TranslationProvider.OpenAI);
+        _modelUsageObserver?.OnModelRequestStarted();
+        bool completed = false;
+        try
+        {
+            await foreach (T item in sendRequest(cancellationToken)
+                .WithCancellation(cancellationToken).ConfigureAwait(false))
+            {
+                yield return item;
+            }
+
+            completed = true;
+        }
+        finally
+        {
+            TranslationRequestOutcome outcome = completed
+                ? TranslationRequestOutcome.Succeeded
+                : cancellationToken.IsCancellationRequested
+                    ? TranslationRequestOutcome.Canceled
+                    : TranslationRequestOutcome.Failed;
+            _requestObserver?.OnRequestCompleted(outcome);
+            _modelUsageObserver?.OnModelRequestCompleted(outcome);
         }
     }
 }

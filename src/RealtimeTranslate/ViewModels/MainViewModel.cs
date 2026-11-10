@@ -38,10 +38,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly AutoCaptureScheduler _scheduler;
     private readonly Hotkey.GlobalHotkeyService _hotkey = new();
     private readonly DispatcherTimer _browserTargetTimer;
+    private readonly ScreenTranslationUsage _screenTranslationUsage = new();
 
     private AppSettings _settings;
     private ITextTranslator? _translator;
     private QuestionAnswerService? _answerService;
+    private UsageWindow? _usageWindow;
 
     private SubtitleEntry? _interimSubtitle;
     private string _statusText = "準備完了";
@@ -64,6 +66,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
         _loopback.PcmAvailable += (_, pcm) => _speech.Write(pcm);
         _loopback.Error += (_, msg) => PostStatus(msg);
+        _speech.AudioBytesWritten += _screenTranslationUsage.OnSpeechAudioBytesWritten;
+        _speech.SessionStarted += (_, _) => _screenTranslationUsage.OnSpeechSessionStarted();
         _speech.Result += OnSpeechResult;
         _speech.Error += (_, msg) => PostStatus(msg);
         _scheduler.OcrReady += OnOcrReady;
@@ -86,6 +90,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<ScreenTextEntry> ScreenTexts { get; } = new();
 
     public ObservableCollection<BrowserWindowOption> BrowserTargets { get; } = new();
+
+    public ScreenTranslationUsage ScreenTranslationUsage => _screenTranslationUsage;
 
     public BrowserWindowOption SelectedBrowserTarget
     {
@@ -144,6 +150,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public bool IsContinuous => _settings.ScreenMode == ScreenCaptureMode.Continuous;
 
     public string ScreenModeText => IsContinuous ? "画面: 常時自動" : "画面: ホットキー";
+
+    public string AutoCaptureIntervalText => $"{Math.Max(300, _settings.AutoCaptureIntervalMs):N0} ms";
+
+    public string OpenAIModelProfileText
+        => AzureOpenAIModelProfiles.GetDisplayName(_settings.OpenAIModelProfile);
 
     public double FontSize
     {
@@ -388,11 +399,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     private ITextTranslator GetTranslator()
     {
-        _translator ??= CreateTranslator(_settings);
+        _translator ??= CreateTranslator(_settings, _screenTranslationUsage);
         return _translator;
     }
 
-    private static ITextTranslator CreateTranslator(AppSettings s)
+    private static ITextTranslator CreateTranslator(AppSettings s, ITranslationRequestObserver requestObserver)
     {
         if (s.ScreenEngine == ScreenTranslationEngine.OpenAI &&
             !string.IsNullOrWhiteSpace(s.OpenAIEndpoint) &&
@@ -400,7 +411,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             !string.IsNullOrWhiteSpace(s.OpenAIDeployment))
         {
             return new AzureOpenAITranslatorService(
-                s.OpenAIEndpoint, s.OpenAIKey, s.OpenAIDeployment, s.OpenAIModelProfile);
+                s.OpenAIEndpoint,
+                s.OpenAIKey,
+                s.OpenAIDeployment,
+                s.OpenAIModelProfile,
+                requestObserver,
+                requestObserver as IModelUsageObserver);
         }
 
         if (s.ScreenEngine == ScreenTranslationEngine.OpenAI)
@@ -409,7 +425,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 "Azure OpenAI 翻訳を選択していますが、エンドポイント・キー・デプロイ名が設定されていません。設定を確認してください。");
         }
 
-        return new AzureTranslatorService(s.TranslatorKey, s.TranslatorRegion, s.SourceLanguage, s.TargetLanguage);
+        return new AzureTranslatorService(
+            s.TranslatorKey, s.TranslatorRegion, s.SourceLanguage, s.TargetLanguage, requestObserver);
     }
 
     // --- AI回答 ---
@@ -512,7 +529,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             _settings.OpenAIEndpoint,
             _settings.OpenAIKey,
             _settings.OpenAIDeployment,
-            _settings.OpenAIModelProfile);
+            _settings.OpenAIModelProfile,
+            _screenTranslationUsage);
         return _answerService;
     }
 
@@ -530,9 +548,24 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             ApplyScreenMode();
             OnPropertyChanged(nameof(IsContinuous));
             OnPropertyChanged(nameof(ScreenModeText));
+            OnPropertyChanged(nameof(AutoCaptureIntervalText));
+            OnPropertyChanged(nameof(OpenAIModelProfileText));
             RefreshBrowserTargets();
             StatusText = "設定を保存しました";
         }
+    }
+
+    public void OpenUsage(Window owner)
+    {
+        if (_usageWindow is { IsVisible: true } existingWindow)
+        {
+            existingWindow.Activate();
+            return;
+        }
+
+        _usageWindow = new UsageWindow(this) { Owner = owner };
+        _usageWindow.Closed += (_, _) => _usageWindow = null;
+        _usageWindow.Show();
     }
 
     private void RefreshBrowserTargets()
