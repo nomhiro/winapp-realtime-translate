@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure;
@@ -17,8 +19,13 @@ public sealed class AzureTranslatorService : ITextTranslator
     private readonly string _to;
 
     public AzureTranslatorService(string key, string region, string sourceLanguage, string targetLanguage)
+        : this(new TextTranslationClient(new AzureKeyCredential(key), region), sourceLanguage, targetLanguage)
     {
-        _client = new TextTranslationClient(new AzureKeyCredential(key), region);
+    }
+
+    internal AzureTranslatorService(TextTranslationClient client, string sourceLanguage, string targetLanguage)
+    {
+        _client = client;
         _from = sourceLanguage;
         _to = targetLanguage;
     }
@@ -30,11 +37,25 @@ public sealed class AzureTranslatorService : ITextTranslator
             return string.Empty;
         }
 
-        Response<IReadOnlyList<TranslatedTextItem>> response =
-            await _client.TranslateAsync(_to, text, _from, cancellationToken).ConfigureAwait(false);
+        string[] lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
+        int[] indexes = Enumerable.Range(0, lines.Length)
+            .Where(i => !string.IsNullOrWhiteSpace(lines[i])).ToArray();
 
-        TranslatedTextItem? item = response.Value.Count > 0 ? response.Value[0] : null;
-        return item is not null && item.Translations.Count > 0 ? item.Translations[0].Text : string.Empty;
+        // Batch semantic lines so the service cannot flatten paragraph/list boundaries.
+        Response<IReadOnlyList<TranslatedTextItem>> response =
+            await _client.TranslateAsync(_to, indexes.Select(i => lines[i]), _from, cancellationToken)
+                .ConfigureAwait(false);
+        if (response.Value.Count != indexes.Length || response.Value.Any(item => item.Translations.Count == 0))
+        {
+            throw new InvalidOperationException("Translator returned an incomplete translation.");
+        }
+
+        for (int i = 0; i < indexes.Length; i++)
+        {
+            lines[indexes[i]] = response.Value[i].Translations[0].Text;
+        }
+
+        return string.Join("\n", lines);
     }
 
     public async IAsyncEnumerable<string> TranslateStreamAsync(

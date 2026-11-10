@@ -536,6 +536,36 @@ public sealed class HistoryUiTests : IClassFixture<HistoryUiFixture>
     }
 
     [Fact]
+    public void MeaningfulBreaksSurviveStreamingResizeAndCopy()
+    {
+        _fixture.Run(() => WithWindow(h =>
+        {
+            const string original = "No. 34 What does the man offer to do?\n(A) Provide a discount\n(B) Issue a refund";
+            const string translation = "34番 男性は何を提案しますか？\n(A) 割引を提供する\n(B) 返金する\n\n次の設問。";
+            var screen = new ScreenTextEntry("browser", original, "");
+            var subtitle = new SubtitleEntry("A short caption.", "短い字幕です。");
+            h.ViewModel.ScreenTexts.Add(screen);
+            h.ViewModel.Subtitles.Add(subtitle);
+
+            foreach (string delta in new[] { translation[..12], translation[12..] })
+            {
+                screen.Translation += delta;
+                h.Flush();
+                Assert.Equal(screen.Translation, ItemText(h.ScreenList, screen, screen.Translation).Text);
+            }
+
+            foreach (double width in new[] { 360d, 800d })
+            {
+                h.Window.Width = width;
+                h.Flush();
+                Assert.Equal(translation, ItemText(h.ScreenList, screen, translation).Text);
+                CopyBoth(h, h.ScreenList, screen, original, translation);
+                CopyBoth(h, h.SubtitleList, subtitle, subtitle.Original, subtitle.Translation);
+            }
+        }));
+    }
+
+    [Fact]
     public void EmptyCopyOptionsAreDisabledUntilTextIsAvailable()
     {
         _fixture.Run(() => WithWindow(h =>

@@ -20,6 +20,8 @@ public sealed class AzureOpenAITranslatorService : ITextTranslator
     private const string SystemPrompt =
         "You are a professional translator. Translate the user's text from English into natural, fluent Japanese. " +
         "The input may come from OCR and contain minor recognition errors — infer the intended words from context. " +
+        "Preserve meaningful sentence and paragraph breaks, and keep each bullet or numbered list item on its own line. " +
+        "Do not reproduce arbitrary OCR line wraps; join text that continues the same sentence. " +
         "Output only the Japanese translation with no explanations, notes, or quotation marks.";
 
     private readonly ChatClient? _chatClient;
